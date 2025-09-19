@@ -1,0 +1,39 @@
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: #0e0e12;
+  color: #fff;
+}
+
+/* Make canvas fill the viewport */
+#stage {
+  display: block;
+  width: 100vw;
+  height: 100vh;
+}
+
+/* Scene controls overlay */
+#controls {
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  display: flex;
+  gap: 8px;
+  z-index: 10;
+}
+#controls button {
+  appearance: none;
+  border: 1px solid rgba(255,255,255,0.18);
+  background: rgba(255,255,255,0.08);
+  color: #eaf2ff;
+  padding: 8px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  font: 600 13px Inter, system-ui, sans-serif;
+  backdrop-filter: blur(6px);
+}
+#controls button:hover { background: rgba(255,255,255,0.16); }
+
+/* Optional: smooth fonts */
+* { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }

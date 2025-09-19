@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>2D Animations – Minimal Framework</title>
+    <link rel="stylesheet" href="css/styles.css" />
+  </head>
+  <body>
+    <div id="controls" role="toolbar" aria-label="Scene Controls">
+      <button data-scene="scene1">Scene 1</button>
+      <button data-scene="scene2">Scene 2</button>
+      <button data-scene="scene3">Scene 3</button>
+      <button data-scene="scene4">Scene 4</button>
+      <button id="reset" title="Reset current scene">Reset</button>
+    </div>
+    <canvas id="stage" aria-label="2D Animation Stage"></canvas>
+
+    <!--
+      How to use:
+      - Open this file via a local server (not file://) so modules load.
+      - See README.md for commands and embedding notes.
+    -->
+
+    <script type="module">
+      import { Engine } from './js/engine.js';
+
+      const canvas = document.getElementById('stage');
+      const engine = new Engine(canvas, { background: '#0e0e12' });
+
+      let currentScene = null;
+
+      async function loadScene(name) {
+        const mod = await import(`./js/scenes/${name}.js`);
+        const scene = await mod.createScene(engine);
+        engine.setScene(scene);
+        currentScene = scene;
+      }
+
+      // Wire buttons
+      document.querySelectorAll('#controls [data-scene]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const name = btn.getAttribute('data-scene');
+          await loadScene(name);
+        });
+      });
+
+      // Reset button calls scene.reset() if present
+      document.getElementById('reset').addEventListener('click', () => {
+        if (currentScene && typeof currentScene.reset === 'function') {
+          currentScene.reset();
+        }
+      });
+
+      // Start engine and initial scene
+      await loadScene('scene1');
+      engine.start();
+    </script>
+  </body>
+  </html>
