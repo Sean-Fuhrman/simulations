@@ -1,38 +1,25 @@
 import { Scene, Layer, Entity, Circle, TextEntity } from '../engine.js';
 
 export async function createScene(engine) {
-  // Artsy chic vibe: deep navy background; gradient backdrop entity overlays
-  engine.background = '#0b0f18';
+  // Unified theme background
+  engine.background = '#0e0e12';
 
   const scene = new Scene();
 
   const layerBG = new Layer(-1);
-  const layerBoxes = new Layer(0);
-  const layerCircles = new Layer(1);
-  const layerUI = new Layer(2);
-  scene.add(layerBG, layerBoxes, layerCircles, layerUI);
+  const layerCircles = new Layer(0);
+  const layerBoxes = new Layer(1); // draw above circles to occlude walls
+  const layerUI = new Layer(3);
+  scene.add(layerBG, layerCircles, layerBoxes, layerUI);
 
   const W = () => engine.canvas.clientWidth;
   const H = () => engine.canvas.clientHeight;
 
-  // Backdrop gradient entity
-  class Backdrop extends Entity {
-    drawSelf(ctx) {
-      const w = W();
-      const h = H();
-      const g = ctx.createRadialGradient(w * 0.2, h * 0.15, 80, w * 0.5, h * 0.55, Math.max(w, h) * 0.9);
-      g.addColorStop(0, '#1b2440');
-      g.addColorStop(1, '#0b0f18');
-      ctx.fillStyle = g;
-      ctx.fillRect(-this.anchorX * w, -this.anchorY * h, w, h);
-    }
-  }
-  const backdrop = new Backdrop({ x: 0, y: 0, anchorX: 0, anchorY: 0 });
-  layerBG.add(backdrop);
+  // Removed gradient backdrop to keep unified background theme
 
   // Open-top box entity (draws only left, right, and bottom)
   class OpenBox extends Entity {
-    constructor({ width, height, stroke = 'rgba(234,242,255,0.9)', lineWidth = 8, radius = 14, ...rest }) {
+    constructor({ width, height, stroke = '#34d399', lineWidth = 12, radius = 14, ...rest }) {
       super(rest);
       this.width = width; this.height = height;
       this.stroke = stroke; this.lineWidth = lineWidth; this.radius = radius;
@@ -48,16 +35,21 @@ export async function createScene(engine) {
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
       ctx.beginPath();
-      // Left side (open near top corner rounding)
-      ctx.moveTo(x0, y1);
+      // Left vertical (stop r above bottom and r below top to respect arcs)
+      ctx.moveTo(x0, y1 - r);
       ctx.lineTo(x0, y0 + r);
-      // Bottom with rounded corners
-      ctx.arcTo(x0, y1, x0 + r, y1, r); // bottom-left corner (subtle, mostly a smooth join)
-      ctx.lineTo(x1 - r, y1);
-      ctx.arcTo(x1, y1, x1, y1 - r, r); // bottom-right
-      // Right side up to near top
+      // Right vertical
+      ctx.moveTo(x1, y1 - r);
       ctx.lineTo(x1, y0 + r);
-      // top remains open (no stroke across)
+      // Bottom edge with rounded corners
+      ctx.moveTo(x0 + r, y1);
+      ctx.lineTo(x1 - r, y1);
+      // Bottom-right corner arc up the right side
+      ctx.arcTo(x1, y1, x1, y1 - r, r);
+      // Bottom-left corner arc up the left side
+      ctx.moveTo(x0 + r, y1);
+      ctx.arcTo(x0, y1, x0, y1 - r, r);
+      // Top remains open (no stroke across)
       ctx.stroke();
     }
   }
@@ -92,8 +84,11 @@ export async function createScene(engine) {
     return c;
   }
 
-  const layerCounts = new Layer(3);
+  const layerCounts = new Layer(2);
   scene.add(layerCounts);
+
+  // Title card
+  let title, subtitle;
 
   function buildScene() {
     layerBoxes.entities = [];
@@ -102,23 +97,38 @@ export async function createScene(engine) {
     layerCounts.entities = [];
     boxes.length = 0;
 
+    // Create title each build so reset() keeps it
+    title = new TextEntity({
+      text: 'Scene 3',
+      x: W() / 2, y: 80,
+      font: '700 42px Inter, system-ui, sans-serif',
+      color: '#c7e1ff',
+    });
+    subtitle = new TextEntity({
+      text: 'Arc flow between open boxes',
+      x: W() / 2, y: 120,
+      font: '500 18px Inter, system-ui, sans-serif',
+      color: '#8fb3e1',
+    });
+    layerUI.add(title, subtitle);
+
     const { boxW, boxH, y, xs } = layout();
     for (let i = 0; i < 4; i++) {
       const x = xs[i];
-      const box = new OpenBox({ x, y, width: boxW, height: boxH, stroke: 'rgba(234,242,255,0.9)', lineWidth: 8, radius: 14 });
+      const box = new OpenBox({ x, y, width: boxW, height: boxH, stroke: '#34d399', lineWidth: 12, radius: 14 });
       layerBoxes.add(box);
       const countLabel = new TextEntity({ text: '', x, y: y + boxH / 2 + 24, font: '600 13px Inter, system-ui, sans-serif', color: 'rgba(234,242,255,0.75)' });
       layerUI.add(countLabel);
-      boxes.push({ box, label: countLabel, circles: [], pad: 12, color: palette[i % palette.length] });
+      boxes.push({ box, label: countLabel, circles: [], pad: 14, color: palette[i % palette.length] });
     }
 
-    // Seed circles (100–400 per box)
+    // Seed circles (100–400 per box), non-overlapping and anywhere inside
     for (let i = 0; i < boxes.length; i++) {
       const group = boxes[i];
       const count = Math.floor(100 + Math.random() * 301);
       for (let j = 0; j < count; j++) {
         const c = makeGlowCircle(group.color);
-        const p = randomPointInBox(group);
+        const p = randomPointInBoxNonOverlapping(group, c.radius, 40);
         c.x = p.x; c.y = p.y;
         // Arc move state: { sx,sy, cx,cy, tx,ty, t, dur }
         c._arc = null;
@@ -154,6 +164,22 @@ export async function createScene(engine) {
     return { x, y };
   }
 
+  function randomPointInBoxNonOverlapping(group, radius = 3, tries = 30) {
+    for (let t = 0; t < tries; t++) {
+      const p = randomPointInBox(group);
+      let ok = true;
+      for (let k = 0; k < group.circles.length; k++) {
+        const q = group.circles[k];
+        const dx = p.x - q.x, dy = p.y - q.y;
+        const dmin = radius + q.radius + 2;
+        if (dx * dx + dy * dy < dmin * dmin) { ok = false; break; }
+      }
+      if (ok) return p;
+    }
+    // fallback: return a random spot (may overlap if too crowded)
+    return randomPointInBox(group);
+  }
+
   function attemptMove() {
     const counts = boxes.map(b => b.circles.length);
     const order = [0, 1, 2, 3].sort(() => Math.random() - 0.5);
@@ -175,10 +201,10 @@ export async function createScene(engine) {
       source.circles.splice(idx, 1);
       counts[si] -= 1;
 
-      // Choose landing point near top interior of target box
-      const pad = target.pad;
-      const tx = target.box.x + (Math.random() * (target.box.width - pad * 2) - (target.box.width / 2 - pad));
-      const ty = target.box.y - target.box.height / 2 + pad + Math.random() * 40; // near top inside
+      // Choose landing point anywhere inside target box, prefer non-overlapping
+      const pt = randomPointInBoxNonOverlapping(target, circle.radius, 40);
+      const tx = pt.x;
+      const ty = pt.y;
 
       // Arc control point: above both box tops, mid-way x with an upward lift
       const sx = circle.x, sy = circle.y;
@@ -218,6 +244,10 @@ export async function createScene(engine) {
   // Responsive reflow
   scene.onResize = () => {
     const { boxW, boxH, y, xs } = layout();
+    if (title && subtitle) {
+      title.x = W() / 2; title.y = 80;
+      subtitle.x = W() / 2; subtitle.y = 120;
+    }
     for (let i = 0; i < boxes.length; i++) {
       const group = boxes[i];
       group.box.x = xs[i];
@@ -226,11 +256,11 @@ export async function createScene(engine) {
       group.box.height = boxH;
       group.label.x = xs[i];
       group.label.y = y + boxH / 2 + 24;
-      // If any circle is outside top opening, nudge it toward inside
+      // Nudge circles to valid interior positions after resize (non-overlapping targets)
       for (const c of group.circles) {
         if (!c._arc) {
           // keep within bounds after resize
-          const p = randomPointInBox(group);
+          const p = randomPointInBoxNonOverlapping(group, c.radius, 20);
           c._arc = { sx: c.x, sy: c.y, cx: (c.x + p.x) / 2, cy: Math.min(group.box.y - group.box.height / 2, c.y) - 60, tx: p.x, ty: p.y, t: 0, dur: 0.4 };
         }
       }
@@ -241,4 +271,3 @@ export async function createScene(engine) {
   scene.onResize();
   return scene;
 }
-

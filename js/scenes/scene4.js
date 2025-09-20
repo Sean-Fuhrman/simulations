@@ -1,8 +1,8 @@
 import { Scene, Layer, Entity, Circle, TextEntity } from '../engine.js';
 
 export async function createScene(engine) {
-  // Atmosphere
-  engine.background = '#0a0d14';
+  // Unified theme background
+  engine.background = '#0e0e12';
 
   const scene = new Scene();
   const layerBG = new Layer(-2);
@@ -15,18 +15,7 @@ export async function createScene(engine) {
   const W = () => engine.canvas.clientWidth;
   const H = () => engine.canvas.clientHeight;
 
-  // Backdrop gradient sky
-  class Sky extends Entity {
-    drawSelf(ctx) {
-      const w = W(), h = H();
-      const g = ctx.createLinearGradient(0, 0, 0, h);
-      g.addColorStop(0, '#0f1422');
-      g.addColorStop(1, '#09101c');
-      ctx.fillStyle = g;
-      ctx.fillRect(0, 0, w, h);
-    }
-  }
-  layerBG.add(new Sky({ x: 0, y: 0, anchorX: 0, anchorY: 0 }));
+  // Removed sky gradient to keep unified background theme
 
   // Cliff silhouette: left side polygon with subtle gradients
   class Cliff extends Entity {
@@ -211,4 +200,3 @@ export async function createScene(engine) {
   rebuildLayout();
   return scene;
 }
-

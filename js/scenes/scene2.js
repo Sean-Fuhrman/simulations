@@ -1,8 +1,8 @@
 import { Scene, Circle, TextEntity, Tween, Easing } from '../engine.js';
 
 export async function createScene(engine) {
-  // Different background for contrast
-  engine.background = '#0a1624';
+  // Unified theme background
+  engine.background = '#0e0e12';
 
   const scene = new Scene();
   const W = () => engine.canvas.clientWidth;
@@ -73,4 +73,3 @@ export async function createScene(engine) {
 
   return scene;
 }
-
